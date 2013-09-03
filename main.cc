@@ -4,6 +4,7 @@
 #include <QVBoxLayout>
 #include <QApplication>
 #include <QDebug>
+#include <assert.h>
 
 #include "main.hh"
 
@@ -25,6 +26,7 @@ ChatDialog::ChatDialog()
 {
 	setWindowTitle("Peerster");
 
+
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
 	textview = new QTextEdit(this);
@@ -42,14 +44,55 @@ ChatDialog::ChatDialog()
 	layout->addWidget(textinput);
 	setLayout(layout);
 
+	// Create a UDP network socket
+	if (!socket.bind())
+		exit(1);
+	connect(&socket, SIGNAL(readyRead()), this, SLOT(receiveMessage()));
+}
+
+QVariantMap ChatDialog::createMap(QString message)
+{
+	QVariantMap qvm;
+	qvm["ChatText"]= message;
+	return qvm;
+}
+
+//Serialize into a QByteArray using a QDataStream object
+QByteArray ChatDialog::serialize(QVariantMap qvm)
+{
+	QByteArray array;
+	QDataStream out(&array, QIODevice::WriteOnly);
+	out << qvm;
+	return array;
 }
 
 void ChatDialog::transmitMessage(QString message)
 {
 	// Initially, just echo the string locally.
 	// Insert some networking code here...
+	qDebug() << socket.hasPendingDatagrams() << "pedning";
 	qDebug() << "FIX: send message to other peers: " << message;
 	textview->append(message);
+	QByteArray array = serialize(createMap(message));
+	qDebug() << "ARRAY:" << array;
+	socket.broadcastOnRevolvingFrequencies(array);
+}
+
+void ChatDialog::receiveMessage()
+{
+	QByteArray datagram;
+    datagram.resize(socket.pendingDatagramSize());
+    QHostAddress sender;
+    quint16 senderPort;
+    socket.readDatagram(datagram.data(), datagram.size(),
+                                    &sender, &senderPort);
+	QVariantMap qvm;
+	QDataStream in(&datagram, QIODevice::ReadOnly);
+	in >> qvm;
+	assert(qvm.size() == 1);
+	assert(qvm.value("ChatText").type() == QVariant::String);
+	textview->append(qvm.value("ChatText").toString());
+
 }
 
 NetSocket::NetSocket()
@@ -80,6 +123,17 @@ bool NetSocket::bind()
 	return false;
 }
 
+void NetSocket::broadcastOnRevolvingFrequencies(QByteArray array)
+{
+	for (int i = myPortMin; i <= myPortMax; ++i)
+	{
+		int bytes = writeDatagram(array, QHostAddress(QHostAddress::LocalHost), i);
+		qDebug() << "Wrote " << bytes << " bytes to port " << i;
+	}
+}
+
+
+
 int main(int argc, char **argv)
 {
 	// Initialize Qt toolkit
@@ -90,9 +144,9 @@ int main(int argc, char **argv)
 	dialog.show();
 
 	// Create a UDP network socket
-	NetSocket sock;
-	if (!sock.bind())
-		exit(1);
+	// NetSocket sock;
+	// if (!sock.bind())
+	// 	exit(1);
 
 	// Enter the Qt main loop; everything else is event driven
 	return app.exec();

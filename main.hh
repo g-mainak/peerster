@@ -18,21 +18,6 @@ class MTextEdit : public QTextEdit
     	void messageSent(QString message);
 };
 
-class ChatDialog : public QDialog
-{
-	Q_OBJECT
-
-	public:
-		ChatDialog();
-
-	public slots:
-		void transmitMessage(QString message);
-
-	private:
-		QTextEdit *textview;
-		MTextEdit *textinput;
-};
-
 class NetSocket : public QUdpSocket
 {
 	Q_OBJECT
@@ -42,10 +27,34 @@ class NetSocket : public QUdpSocket
 
 		// Bind this socket to a Peerster-specific default port.
 		bool bind();
+		void broadcastOnRevolvingFrequencies(QByteArray);
 
 	private:
 		int myPortMin, myPortMax;
 };
+
+class ChatDialog : public QDialog
+{
+	Q_OBJECT
+
+	public:
+		ChatDialog();
+
+	private:
+		QVariantMap createMap(QString);
+		QByteArray serialize(QVariantMap);
+
+
+	public slots:
+		void transmitMessage(QString message);
+		void receiveMessage();
+
+	private:
+		QTextEdit *textview;
+		MTextEdit *textinput;
+		NetSocket socket;
+};
+
 
 
 #endif // PEERSTER_MAIN_HH
