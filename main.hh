@@ -3,35 +3,9 @@
 
 #include <QDialog>
 #include <QTextEdit>
-#include <QUdpSocket>
-#include <QKeyEvent>
-
-class MTextEdit : public QTextEdit
-{
-	Q_OBJECT
-
-    public:
-    	MTextEdit(QWidget *parent);
-    	void keyPressEvent(QKeyEvent *);
-
-    signals:
-    	void messageSent(QString message);
-};
-
-class NetSocket : public QUdpSocket
-{
-	Q_OBJECT
-
-	public:
-		NetSocket();
-
-		// Bind this socket to a Peerster-specific default port.
-		bool bind();
-		void broadcastOnRevolvingFrequencies(QByteArray);
-
-	private:
-		int myPortMin, myPortMax;
-};
+#include <QHash>
+#include "mtextedit.hh"
+#include "netsocket.hh"
 
 class ChatDialog : public QDialog
 {
@@ -39,20 +13,36 @@ class ChatDialog : public QDialog
 
 	public:
 		ChatDialog();
+		QVariantMap createStatusMap();
+		QVariantMap createRumorMap(QString);
+		void receiveStatus(QVariantMap, QHostAddress, quint16);
+		void receiveRumor(QVariantMap, QHostAddress, quint16);
+		void transmitRumorMessage(QVariantMap, QHostAddress, quint16);
+		void transmitStatusMessage(QHostAddress, quint16);
+		void startRumorMongering(QVariantMap, QHostAddress, quint16);
+		void startRumorMongering();
 
 	private:
-		QVariantMap createMap(QString);
 		QByteArray serialize(QVariantMap);
-
+		int compare(const QVariantMap, const QVariantMap);
+		bool newMessage(QVariantMap);
+		QVariantMap findAhead(QVariantMap, QVariantMap);
+		void insertIntoPrevMessages(QString, quint32, QVariantMap);
+		QVariantMap getPrevMessage(QString, quint32);
 
 	public slots:
-		void transmitMessage(QString message);
 		void receiveMessage();
+		void transmitOriginalMessage(QString);
 
 	private:
 		QTextEdit *textview;
 		MTextEdit *textinput;
 		NetSocket socket;
+		quint32 seqNum;
+		QMultiHash<QString, quint32> prevMessageIds;
+		QHash<QString, QVariantMap> prevMessages;
+		QString identifier;
+		QVariantMap lastMessage;
 };
 
 

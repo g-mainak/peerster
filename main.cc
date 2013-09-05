@@ -4,28 +4,17 @@
 #include <QVBoxLayout>
 #include <QApplication>
 #include <QDebug>
+#include <QHostInfo>
 #include <assert.h>
 
 #include "main.hh"
 
-MTextEdit::MTextEdit(QWidget *parent) : QTextEdit(parent) {}
-
-void MTextEdit::keyPressEvent(QKeyEvent *event)
-{
-	if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
-	{
-		emit messageSent(this->toPlainText());
-		// Clear the textinput to get ready for the next input message.
-		this->clear();		
-	}
-	else
-		QTextEdit::keyPressEvent(event);
-}
-
 ChatDialog::ChatDialog()
 {
 	setWindowTitle("Peerster");
-
+	seqNum = 1;
+	identifier = QHostInfo::localHostName() + QString(rand());
+	qDebug() << identifier;
 
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
@@ -34,7 +23,7 @@ ChatDialog::ChatDialog()
 
 	textinput = new MTextEdit(this);
 	textinput->setFocus(); // Set focus here.
-	connect(textinput, SIGNAL(messageSent(QString)), this, SLOT(transmitMessage(QString)));
+	connect(textinput, SIGNAL(messageSent(QString)), this, SLOT(transmitOriginalMessage(QString)));
 
 	// Lay out the widgets to appear in the main window.
 	// For Qt widget and layout concepts see:
@@ -50,12 +39,34 @@ ChatDialog::ChatDialog()
 	connect(&socket, SIGNAL(readyRead()), this, SLOT(receiveMessage()));
 }
 
-QVariantMap ChatDialog::createMap(QString message)
+QVariantMap ChatDialog::createStatusMap()
+{
+	QVariantMap qvm, nestedQvm;
+	QHashIterator<QString, quint32> i(prevMessageIds);
+	while (i.hasNext())
+	{
+		i.next();
+		QList<quint32> list = prevMessageIds.values(i.key());
+		qSort(list.begin(), list.end());
+		quint32 j = 0;
+		while(list.at(j) == j + 1)
+			j++;
+		nestedQvm.insert(i.key(), j + 1);
+	}
+	qvm["Want"] = nestedQvm;
+	// qDebug() << "Nested QVM:" << qvm;
+	return qvm;
+}
+
+QVariantMap ChatDialog::createRumorMap(QString message)
 {
 	QVariantMap qvm;
 	qvm["ChatText"]= message;
+	qvm["Origin"] = identifier;
+	qvm["SeqNo"] = seqNum++;
 	return qvm;
 }
+
 
 //Serialize into a QByteArray using a QDataStream object
 QByteArray ChatDialog::serialize(QVariantMap qvm)
@@ -66,16 +77,28 @@ QByteArray ChatDialog::serialize(QVariantMap qvm)
 	return array;
 }
 
-void ChatDialog::transmitMessage(QString message)
+void ChatDialog::transmitOriginalMessage(QString message)
 {
-	// Initially, just echo the string locally.
-	// Insert some networking code here...
-	qDebug() << socket.hasPendingDatagrams() << "pedning";
-	qDebug() << "FIX: send message to other peers: " << message;
 	textview->append(message);
-	QByteArray array = serialize(createMap(message));
-	qDebug() << "ARRAY:" << array;
+	QVariantMap qvm = createRumorMap(message);
+	QByteArray array = serialize(qvm);
 	socket.broadcastOnRevolvingFrequencies(array);
+	qDebug() << "TRANSMITTED Original message" << message << "to all peers" ;
+	insertIntoPrevMessages(identifier, seqNum - 1, qvm);
+}
+
+void ChatDialog::transmitRumorMessage(QVariantMap qvm, QHostAddress address, quint16 port)
+{
+	QByteArray array = serialize(qvm);
+	socket.transmit(array, address, port);
+	qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << address << " : " << port; 
+}
+
+void ChatDialog::transmitStatusMessage(QHostAddress address, quint16 port)
+{
+	QByteArray array = serialize(createStatusMap());
+	socket.transmit(array, address, port);
+	qDebug() << "TRANSMITTED status message to " << address << " : " << port; 
 }
 
 void ChatDialog::receiveMessage()
@@ -89,50 +112,147 @@ void ChatDialog::receiveMessage()
 	QVariantMap qvm;
 	QDataStream in(&datagram, QIODevice::ReadOnly);
 	in >> qvm;
-	assert(qvm.size() == 1);
-	assert(qvm.value("ChatText").type() == QVariant::String);
-	textview->append(qvm.value("ChatText").toString());
-
+	
+	if (qvm.size() == 1)
+		receiveStatus(qvm, sender, senderPort);
+	else if (qvm.size() == 3)
+		receiveRumor(qvm, sender, senderPort);
+	else {}
+		// Error!
 }
 
-NetSocket::NetSocket()
+int ChatDialog::compare(QVariantMap current, QVariantMap foreign)
 {
-	// Pick a range of four UDP ports to try to allocate by default,
-	// computed based on my Unix user ID.
-	// This makes it trivial for up to four Peerster instances per user
-	// to find each other on the same host,
-	// barring UDP port conflicts with other applications
-	// (which are quite possible).
-	// We use the range from 32768 to 49151 for this purpose.
-	myPortMin = 32768 + (getuid() % 4096)*4;
-	myPortMax = myPortMin + 3;
+	QMapIterator<QString, QVariant> i(current);
+	bool ahead =false, behind = false;
+	while (i.hasNext())
+	{
+		i.next();
+		quint32 x = i.value().toInt();
+		quint32 y = foreign.value(i.key(), 0).toInt();
+		if (x > y)
+			ahead = true;
+		else if (x < y)
+			behind = true;
+	}
+	QMapIterator<QString, QVariant> j(foreign);
+	while (j.hasNext())
+	{
+		j.next();
+		quint32 x = j.value().toInt();
+		quint32 y = current.value(j.key(), 0).toInt();
+		if (x > y)
+			behind = true;
+		else if (x < y)
+			ahead = true;
+	}
+	return (ahead) ? 1 : ((behind) ? -1 : 0);
 }
 
-bool NetSocket::bind()
+QVariantMap ChatDialog::findAhead(QVariantMap current, QVariantMap foreign)
 {
-	// Try to bind to each of the range myPortMin..myPortMax in turn.
-	for (int p = myPortMin; p <= myPortMax; p++) {
-		if (QUdpSocket::bind(p)) {
-			qDebug() << "bound to UDP port " << p;
-			return true;
+	QMapIterator<QString, QVariant> i(current);
+	// qDebug() << current;
+	// qDebug() << foreign;
+	while (i.hasNext())
+	{
+		i.next();
+		quint32 x = i.value().toInt();
+		quint32 y = foreign.value(i.key(), 0).toInt();
+		qDebug() << i.key() << "<Current, Foreign>" << x << y;
+		if (x > y)
+		{
+			QVariantMap qvm;
+			qvm.insert(QString("origin"), i.key());
+			qvm.insert(QString("message_sequence"), (y==0)?1:y);
+			return qvm;
 		}
 	}
-
-	qDebug() << "Oops, no ports in my default range " << myPortMin
-		<< "-" << myPortMax << " available";
-	return false;
+	return QVariantMap(); //ERROR!
 }
 
-void NetSocket::broadcastOnRevolvingFrequencies(QByteArray array)
+void ChatDialog::receiveStatus(QVariantMap foreignStatusMap, QHostAddress sender, quint16 senderPort)
 {
-	for (int i = myPortMin; i <= myPortMax; ++i)
+	qDebug() << "Received Status Message from " << sender << " : " << senderPort;
+	QVariantMap statusMap = createStatusMap();
+	switch (compare(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()))
 	{
-		int bytes = writeDatagram(array, QHostAddress(QHostAddress::LocalHost), i);
-		qDebug() << "Wrote " << bytes << " bytes to port " << i;
+		case 1: qDebug() << "We're AHEAD";
+			startRumorMongering(findAhead(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()), sender, senderPort);
+			break;
+		case -1: qDebug() << "We're BEHIND";
+			transmitStatusMessage(sender, senderPort);
+			break;
+		case 0: qDebug() << "We're SAME";
+			if (rand() % 2)
+				return;
+			else
+				startRumorMongering();
+			break;
+		default: //Error!
+				break;
 	}
 }
 
+void ChatDialog::startRumorMongering()
+{
+	startRumorMongering(lastMessage, QHostAddress::LocalHost, socket.randomPort());
+}
 
+void ChatDialog::startRumorMongering(QVariantMap qvm, QHostAddress address, quint16 port)
+{
+	if (!qvm.empty())
+	{
+		QString origin = qvm.value("origin").toString();
+		quint32 sequence = qvm.value("message_sequence").toUInt();
+		QVariantMap message = getPrevMessage(origin, sequence);
+		transmitRumorMessage(message, address, port);
+	}
+}
+
+bool ChatDialog::newMessage(QVariantMap qvm)
+{
+	return (prevMessages.contains(qvm.value("Origin").toString() + "|" + QString(qvm.value("SeqNo").toUInt())));
+}
+
+void ChatDialog::insertIntoPrevMessages(QString origin, quint32 sequence, QVariantMap message)
+{
+	prevMessageIds.insert(origin, sequence);
+	QString key = origin + QString("|") + QString(sequence);
+	prevMessages.insert(key, message);
+	QVariantMap qvm;
+	qvm.insert("origin", origin);
+	qvm.insert("message_sequence", sequence);
+	lastMessage = qvm;
+}
+
+QVariantMap ChatDialog::getPrevMessage(QString origin, quint32 sequence)
+{
+	QString key = origin + QString("|") + QString(sequence);
+	if (prevMessages.contains(key))
+		return prevMessages.value(key);
+	else
+		return QVariantMap();
+}
+
+void ChatDialog::receiveRumor(QVariantMap qvm, QHostAddress sender, quint16 senderPort)
+{
+	qDebug() << "Received rumor message" << qvm.value("ChatText").toString() << " from " << sender << ":" << senderPort;
+	if (!newMessage(qvm))
+	{
+		textview->append(qvm.value("Origin").toString() + QString(": ") + qvm.value("ChatText").toString());
+		insertIntoPrevMessages(qvm.value("Origin").toString(), qvm.value("SeqNo").toUInt(), qvm);
+		transmitStatusMessage(sender, senderPort);
+		startRumorMongering();
+	}
+	else
+		qDebug()<<"Same mesg";
+	// TODO:
+	//   Pick a random neighbour (+- 1)
+	//   Send rumor to that neighbor
+	//   Done.
+	//   Technically, there will be a timeout step here
+}
 
 int main(int argc, char **argv)
 {
