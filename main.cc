@@ -6,15 +6,15 @@
 #include <QDebug>
 #include <QHostInfo>
 #include <assert.h>
-
+#include <QTimer>
 #include "main.hh"
 
 ChatDialog::ChatDialog()
 {
-	setWindowTitle("Peerster");
-	seqNum = 1;
 	identifier = QHostInfo::localHostName() + QString(rand());
 	qDebug() << identifier;
+	setWindowTitle("Peerster" + identifier);
+	seqNum = 1;
 
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
@@ -37,6 +37,15 @@ ChatDialog::ChatDialog()
 	if (!socket.bind())
 		exit(1);
 	connect(&socket, SIGNAL(readyRead()), this, SLOT(receiveMessage()));
+
+	for (int i = 0; i < socket.peers.size(); ++i)
+    	{
+    		qDebug() << socket.peers.at(i)->getIp() << socket.peers.at(i)->getPort();
+    	}
+
+	QTimer *timer = new QTimer(this);
+    connect(timer, SIGNAL(timeout()), this, SLOT(ping()));
+    timer->start(10000);
 }
 
 QVariantMap ChatDialog::createStatusMap()
@@ -79,26 +88,34 @@ QByteArray ChatDialog::serialize(QVariantMap qvm)
 
 void ChatDialog::transmitOriginalMessage(QString message)
 {
-	textview->append(message);
+	textview->append(QString("Me: ") + message);
 	QVariantMap qvm = createRumorMap(message);
 	QByteArray array = serialize(qvm);
-	socket.broadcastOnRevolvingFrequencies(array);
-	qDebug() << "TRANSMITTED Original message" << message << "to all peers" ;
 	insertIntoPrevMessages(identifier, seqNum - 1, qvm);
+	startRumorMongering();
 }
 
-void ChatDialog::transmitRumorMessage(QVariantMap qvm, QHostAddress address, quint16 port)
+void ChatDialog::transmitRumorMessage(QVariantMap qvm, quint16 peer)
 {
 	QByteArray array = serialize(qvm);
-	socket.transmit(array, address, port);
-	qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << address << " : " << port; 
+	socket.transmit(array, peer);
+	qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << peer; 
 }
 
-void ChatDialog::transmitStatusMessage(QHostAddress address, quint16 port)
+void ChatDialog::ping()
+{
+	transmitStatusMessage(socket.randomPeer());
+	for (int i = 0; i < socket.peers.size(); ++i)
+    	{
+    		qDebug() << socket.peers.at(i)->getIp() << socket.peers.at(i)->getPort();
+    	}
+}
+
+void ChatDialog::transmitStatusMessage(quint16 peer)
 {
 	QByteArray array = serialize(createStatusMap());
-	socket.transmit(array, address, port);
-	qDebug() << "TRANSMITTED status message to " << address << " : " << port; 
+	socket.transmit(array, peer);
+	qDebug() << "TRANSMITTED status message to " << peer; 
 }
 
 void ChatDialog::receiveMessage()
@@ -178,10 +195,10 @@ void ChatDialog::receiveStatus(QVariantMap foreignStatusMap, QHostAddress sender
 	switch (compare(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()))
 	{
 		case 1: qDebug() << "We're AHEAD";
-			startRumorMongering(findAhead(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()), sender, senderPort);
+			startRumorMongering(findAhead(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()), socket.findPeer(sender, senderPort));
 			break;
 		case -1: qDebug() << "We're BEHIND";
-			transmitStatusMessage(sender, senderPort);
+			transmitStatusMessage(socket.findPeer(sender, senderPort));
 			break;
 		case 0: qDebug() << "We're SAME";
 			if (rand() % 2)
@@ -196,17 +213,17 @@ void ChatDialog::receiveStatus(QVariantMap foreignStatusMap, QHostAddress sender
 
 void ChatDialog::startRumorMongering()
 {
-	startRumorMongering(lastMessage, QHostAddress::LocalHost, socket.randomPort());
+	startRumorMongering(lastMessage, socket.randomPeer());
 }
 
-void ChatDialog::startRumorMongering(QVariantMap qvm, QHostAddress address, quint16 port)
+void ChatDialog::startRumorMongering(QVariantMap qvm, quint16 peer)
 {
 	if (!qvm.empty())
 	{
 		QString origin = qvm.value("origin").toString();
 		quint32 sequence = qvm.value("message_sequence").toUInt();
 		QVariantMap message = getPrevMessage(origin, sequence);
-		transmitRumorMessage(message, address, port);
+		transmitRumorMessage(message, peer);
 	}
 }
 
@@ -242,7 +259,7 @@ void ChatDialog::receiveRumor(QVariantMap qvm, QHostAddress sender, quint16 send
 	{
 		textview->append(qvm.value("Origin").toString() + QString(": ") + qvm.value("ChatText").toString());
 		insertIntoPrevMessages(qvm.value("Origin").toString(), qvm.value("SeqNo").toUInt(), qvm);
-		transmitStatusMessage(sender, senderPort);
+		transmitStatusMessage(socket.findPeer(sender, senderPort));
 		startRumorMongering();
 	}
 	else
@@ -270,4 +287,5 @@ int main(int argc, char **argv)
 
 	// Enter the Qt main loop; everything else is event driven
 	return app.exec();
+
 }

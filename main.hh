@@ -4,8 +4,10 @@
 #include <QDialog>
 #include <QTextEdit>
 #include <QHash>
+#include <QVector>
 #include "mtextedit.hh"
 #include "netsocket.hh"
+#include "peer.hh"
 
 class ChatDialog : public QDialog
 {
@@ -17,9 +19,9 @@ class ChatDialog : public QDialog
 		QVariantMap createRumorMap(QString);
 		void receiveStatus(QVariantMap, QHostAddress, quint16);
 		void receiveRumor(QVariantMap, QHostAddress, quint16);
-		void transmitRumorMessage(QVariantMap, QHostAddress, quint16);
-		void transmitStatusMessage(QHostAddress, quint16);
-		void startRumorMongering(QVariantMap, QHostAddress, quint16);
+		void transmitRumorMessage(QVariantMap, quint16);
+		void transmitStatusMessage(quint16);
+		void startRumorMongering(QVariantMap, quint16);
 		void startRumorMongering();
 
 	private:
@@ -31,6 +33,7 @@ class ChatDialog : public QDialog
 		QVariantMap getPrevMessage(QString, quint32);
 
 	public slots:
+		void ping();
 		void receiveMessage();
 		void transmitOriginalMessage(QString);
 
