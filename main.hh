@@ -5,6 +5,7 @@
 #include <QTextEdit>
 #include <QHash>
 #include <QVector>
+#include <QLineEdit>
 #include "mtextedit.hh"
 #include "netsocket.hh"
 #include "peer.hh"
@@ -31,15 +32,19 @@ class ChatDialog : public QDialog
 		QVariantMap findAhead(QVariantMap, QVariantMap);
 		void insertIntoPrevMessages(QString, quint32, QVariantMap);
 		QVariantMap getPrevMessage(QString, quint32);
+		QTimer *timeout;
 
 	public slots:
 		void ping();
 		void receiveMessage();
 		void transmitOriginalMessage(QString);
+		void gotNewPeer();
+		void coinFlip();
 
 	private:
 		QTextEdit *textview;
 		MTextEdit *textinput;
+		QLineEdit *hostinput;
 		NetSocket socket;
 		quint32 seqNum;
 		QMultiHash<QString, quint32> prevMessageIds;

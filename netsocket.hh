@@ -19,6 +19,7 @@ class NetSocket : public QUdpSocket
 		void transmit(QByteArray, quint16);
 		quint16 randomPeer();
 		quint16 findPeer(QHostAddress, quint16);
+		void addPeer(QString);
 		QVector<Peer*> peers;
 
 	private:

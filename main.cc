@@ -25,12 +25,18 @@ ChatDialog::ChatDialog()
 	textinput->setFocus(); // Set focus here.
 	connect(textinput, SIGNAL(messageSent(QString)), this, SLOT(transmitOriginalMessage(QString)));
 
+	hostinput = new QLineEdit(this);
+	connect(hostinput, SIGNAL(returnPressed()),
+                this, SLOT(gotNewPeer()));
+
+
 	// Lay out the widgets to appear in the main window.
 	// For Qt widget and layout concepts see:
 	// http://doc.qt.nokia.com/4.7-snapshot/widgets-and-layouts.html
 	QVBoxLayout *layout = new QVBoxLayout();
 	layout->addWidget(textview);
 	layout->addWidget(textinput);
+	layout->addWidget(hostinput);
 	setLayout(layout);
 
 	// Create a UDP network socket
@@ -38,14 +44,18 @@ ChatDialog::ChatDialog()
 		exit(1);
 	connect(&socket, SIGNAL(readyRead()), this, SLOT(receiveMessage()));
 
-	for (int i = 0; i < socket.peers.size(); ++i)
-    	{
-    		qDebug() << socket.peers.at(i)->getIp() << socket.peers.at(i)->getPort();
-    	}
+	QTimer *entropy = new QTimer(this);
+    connect(entropy, SIGNAL(timeout()), this, SLOT(ping()));
+    entropy->start(10000);
+    timeout = new QTimer(this);
+    timeout->setSingleShot(true);
 
-	QTimer *timer = new QTimer(this);
-    connect(timer, SIGNAL(timeout()), this, SLOT(ping()));
-    timer->start(10000);
+}
+
+void ChatDialog::gotNewPeer()
+{
+	socket.addPeer(hostinput->text());
+	hostinput->clear();
 }
 
 QVariantMap ChatDialog::createStatusMap()
@@ -100,6 +110,15 @@ void ChatDialog::transmitRumorMessage(QVariantMap qvm, quint16 peer)
 	QByteArray array = serialize(qvm);
 	socket.transmit(array, peer);
 	qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << peer; 
+    connect(timeout, SIGNAL(timeout()), this, SLOT(coinFlip()));
+    timeout->start(1000);
+}
+
+void ChatDialog::coinFlip()
+{
+	srand(time(NULL));
+	if (rand() % 2)
+		startRumorMongering();
 }
 
 void ChatDialog::ping()
@@ -190,6 +209,7 @@ QVariantMap ChatDialog::findAhead(QVariantMap current, QVariantMap foreign)
 void ChatDialog::receiveStatus(QVariantMap foreignStatusMap, quint16 peer)
 {
 	qDebug() << "Received Status Message from " << peer;
+	disconnect(timeout, 0, 0, 0);
 	QVariantMap statusMap = createStatusMap();
 	switch (compare(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()))
 	{
