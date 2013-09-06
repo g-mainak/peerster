@@ -3,21 +3,27 @@
 Peer::Peer(QString str)
 {
 	QStringList list = str.split(QRegExp(":"));
-	assert(list.size() == 2);
-	if (QHostAddress(list.at(0)).isNull())
+	if (list.size() == 2)
 	{
-		hostname = list.at(0);
-		QHostInfo::lookupHost(hostname, this, SLOT(lookedUp(QHostInfo)));
-		disabled = true;
+		if (QHostAddress(list.at(0)).isNull())
+		{
+			hostname = list.at(0);
+			QHostInfo::lookupHost(hostname, this, SLOT(lookedUp(QHostInfo)));
+			disabled = true;
+		}
+		else
+		{
+			ip = QHostAddress(list.at(0));
+			disabled = false;
+			// hostname
+		}
+		port = list.at(1).toUInt();
+		qDebug() << "Peer initiated with "<<hostname<<ip<<port;
 	}
 	else
 	{
-		ip = QHostAddress(list.at(0));
-		disabled = false;
-		// hostname
+		qDebug() << "Malformed string. Peer not usable.";
 	}
-	port = list.at(1).toUInt();
-	qDebug() << "Peer initiated with "<<hostname<<ip<<port;
 }
 
 Peer::Peer(QHostAddress address, quint16 port)

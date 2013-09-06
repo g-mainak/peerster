@@ -38,19 +38,12 @@ quint16 NetSocket::randomPeer()
 	return (rand() % peers.size());
 }
 
-void NetSocket::broadcastOnRevolvingFrequencies(QByteArray array)
-{
-	for (int i = myPortMin; i <= myPortMax; ++i)
-		if (!writeDatagram(array, QHostAddress(QHostAddress::LocalHost), i))
-		{	// Error!
-		}
-}
-
 void NetSocket::transmit(QByteArray array, quint16 peerNumber)
 {
 	if (peers[peerNumber]->notDisabled())
 		if (!writeDatagram(array, peers[peerNumber]->getIp(), peers[peerNumber]->getPort()))
-			{	// Error!
+			{	
+				qDebug() << "Could not send datagram. Sorry!";
 			}
 }
 
@@ -59,7 +52,11 @@ quint16 NetSocket::findPeer(QHostAddress address, quint16 port)
 	for (int i = 0; i < peers.size(); ++i)
     	if (peers.at(i)->getIp() == address && peers.at(i)->getPort() == port)
     		return i;
-    Peer p(address, port);
-    peers << &p;
+    peers << new Peer(address, port);
     return peers.size() - 1;
+}
+
+void NetSocket::addPeer(QString str)
+{
+	peers << new Peer(str);
 }
