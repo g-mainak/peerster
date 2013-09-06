@@ -17,8 +17,8 @@ class ChatDialog : public QDialog
 		ChatDialog();
 		QVariantMap createStatusMap();
 		QVariantMap createRumorMap(QString);
-		void receiveStatus(QVariantMap, QHostAddress, quint16);
-		void receiveRumor(QVariantMap, QHostAddress, quint16);
+		void receiveStatus(QVariantMap, quint16);
+		void receiveRumor(QVariantMap, quint16);
 		void transmitRumorMessage(QVariantMap, quint16);
 		void transmitStatusMessage(quint16);
 		void startRumorMongering(QVariantMap, quint16);
