@@ -110,7 +110,6 @@ void ChatDialog::ping()
     		qDebug() << socket.peers.at(i)->getIp() << socket.peers.at(i)->getPort();
     	}
 }
-
 void ChatDialog::transmitStatusMessage(quint16 peer)
 {
 	QByteArray array = serialize(createStatusMap());

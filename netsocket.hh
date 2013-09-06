@@ -21,7 +21,6 @@ class NetSocket : public QUdpSocket
 		quint16 findPeer(QHostAddress, quint16);
 		QVector<Peer*> peers;
 
-
 	private:
 		int myPortMin, myPortMax;
 };
