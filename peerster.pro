@@ -9,5 +9,5 @@ INCLUDEPATH += .
 QT += network
 
 # Input
-HEADERS += main.hh mtextedit.hh netsocket.hh
-SOURCES += main.cc mtextedit.cc netsocket.cc
+HEADERS += main.hh mtextedit.hh netsocket.hh peer.hh
+SOURCES += main.cc mtextedit.cc netsocket.cc peer.cc
