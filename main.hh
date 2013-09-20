@@ -9,6 +9,10 @@
 #include "mtextedit.hh"
 #include "netsocket.hh"
 #include "peer.hh"
+#include "routingtable.hh"
+#include "point2pointview.hh"
+#include <QListView>
+#include <QModelIndex>
 
 class ChatDialog : public QDialog
 {
@@ -18,8 +22,10 @@ class ChatDialog : public QDialog
 		ChatDialog();
 		QVariantMap createStatusMap();
 		QVariantMap createRumorMap(QString);
+		QVariantMap createRouteRumorMap();
 		void receiveStatus(QVariantMap, quint16);
 		void receiveRumor(QVariantMap, quint16);
+		void receivePrivateMessage(QVariantMap);
 		void transmitRumorMessage(QVariantMap, quint16);
 		void transmitStatusMessage(quint16);
 		void startRumorMongering(QVariantMap, quint16);
@@ -32,25 +38,31 @@ class ChatDialog : public QDialog
 		QVariantMap findAhead(QVariantMap, QVariantMap);
 		void insertIntoPrevMessages(QString, quint32, QVariantMap);
 		QVariantMap getPrevMessage(QString, quint32);
-		QTimer *timeout;
 
 	public slots:
 		void ping();
 		void receiveMessage();
 		void transmitOriginalMessage(QString);
+		void transmitRouteRumorMessage(QVariantMap* = NULL);
 		void gotNewPeer();
 		void coinFlip();
+		void transmitPrivateMessage(QVariantMap);
 
 	private:
+		QTimer *timeout;
+		QTimer *entropy;
+		QTimer *routeRumor;
 		QTextEdit *textview;
 		MTextEdit *textinput;
 		QLineEdit *hostinput;
+		Point2PointView *tableview;
 		NetSocket socket;
 		quint32 seqNum;
 		QMultiHash<QString, quint32> prevMessageIds;
 		QHash<QString, QVariantMap> prevMessages;
 		QString identifier;
 		QVariantMap lastMessage;
+		RoutingTable rt;
 };
 
 

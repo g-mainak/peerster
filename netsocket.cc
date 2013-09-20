@@ -34,7 +34,6 @@ bool NetSocket::bind()
 
 quint16 NetSocket::randomPeer()
 {
-	srand(time(NULL));
 	return (rand() % peers.size());
 }
 
@@ -59,4 +58,12 @@ quint16 NetSocket::findPeer(QHostAddress address, quint16 port)
 void NetSocket::addPeer(QString str)
 {
 	peers << new Peer(str);
+}
+
+Peer *NetSocket::getPeer(quint16 peerIndex)
+{
+	if (peerIndex < peers.size())
+		return peers.at(peerIndex);
+	else
+		return NULL;
 }

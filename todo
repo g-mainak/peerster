@@ -1,0 +1,17 @@
+Make a function that takes in a QVM and forwards it to a rnadom peer.
+Test
+Figure out a GUI system that allows clickability.
+Make a private message box class.
+Once the message is entered, box makes a qvm and emits it to the chatdialog. chatdialog transmits it.
+Make the receiver handle the pmessages.
+	if Dest != me,
+		decrement the hop
+	else
+		show to the user
+
+
+Make the functions DRY
+make the functino OOP
+	Peerster
+	Chatdialog
+	Socket
