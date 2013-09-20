@@ -15,11 +15,13 @@ class NetSocket : public QUdpSocket
 
 		// Bind this socket to a Peerster-specific default port.
 		bool bind();
+		void transmitAll(QByteArray);
 		void transmit(QByteArray, quint16);
 		quint16 randomPeer();
 		quint16 findPeer(QHostAddress, quint16);
 		void addPeer(QString);
 		Peer *getPeer(quint16);
+		quint16 getNumPeers();
 
 	private:
 		int myPortMin, myPortMax;

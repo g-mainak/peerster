@@ -10,13 +10,21 @@ class RoutingTable : public QObject
 {
 	Q_OBJECT
 
+	struct routingTableElement
+	{
+		QHostAddress address; 
+		quint16 port;
+		bool indirect;
+		quint32 seqNum;
+	};
+
 	public:
-		void insert(QString, QHostAddress, quint16);
+		void insert(QString, QHostAddress, quint16, bool, quint32);
 		QStringList displayAll();
 		QPair<QHostAddress, quint16> findByOrigin(QString origin);
 
 	private:
-		QHash<QString, QPair<QHostAddress,quint16> > table;
+		QHash<QString, routingTableElement > table;
 
 	signals:
 		void inserted(RoutingTable *);

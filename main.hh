@@ -24,7 +24,7 @@ class ChatDialog : public QDialog
 		QVariantMap createRumorMap(QString);
 		QVariantMap createRouteRumorMap();
 		void receiveStatus(QVariantMap, quint16);
-		void receiveRumor(QVariantMap, quint16);
+		void receiveRumor(QVariantMap, quint16, bool);
 		void receivePrivateMessage(QVariantMap);
 		void transmitRumorMessage(QVariantMap, quint16);
 		void transmitStatusMessage(quint16);
@@ -63,6 +63,7 @@ class ChatDialog : public QDialog
 		QString identifier;
 		QVariantMap lastMessage;
 		RoutingTable rt;
+		bool forward;
 };
 
 
