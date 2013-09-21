@@ -8,16 +8,31 @@ void RoutingTable::insert(QString origin, QHostAddress address, quint16 port, bo
 	re.port = port;
 	re.indirect = indirect;
 	re.seqNum = seqNum;
-	if (table.contains("Origin"))
+	if (table.contains(origin))
 	{
-		if (table.value("Origin").seqNum < seqNum)
+		// qDebug() << "Contains Origin";
+		if (table.value(origin).seqNum < seqNum)
+		{
 			table.insert(origin, re);
-		else if (table.value("Origin").seqNum == seqNum)
-			if (table.value("Origin").indirect && !indirect)
+			// qDebug() << "seqnum less";
+		}
+		else if (table.value(origin).seqNum == seqNum)
+		{
+			// qDebug() << "Same Sequence";
+			if (table.value(origin).indirect && !indirect)
+			{
 				table.insert(origin, re);
+				// qDebug() << "indirect";
+			}
+		}
 	}
 	else
+	{
 		table.insert(origin, re);
+		// qDebug() << "Did not contain origin";
+		routingTableElement rep = table.value(origin);
+		// qDebug() << rep.address << rep.port;
+	}
 	emit inserted(this);
 }
 
@@ -41,4 +56,23 @@ QPair<QHostAddress, quint16> RoutingTable::findByOrigin(QString origin)
 	qp.first = re.address;
 	qp.second = re.port;
 	return qp;
+}
+
+bool RoutingTable::alreadyInTable(QVariantMap qvm)
+{
+	QString origin = qvm.value("Origin").toString();
+	if (table.contains(origin))
+	{
+		// qDebug() << "Origin" << table.value(origin).seqNum << qvm.value("SeqNo").toUInt();
+		if (table.value(origin).seqNum == qvm.value("SeqNo").toUInt())
+		{
+			// qDebug() << "same Sequence";
+			if (!table.value(origin).indirect)
+			{
+				// qDebug() << "indirect";
+				return true;
+			}
+		}
+	}
+	return false;
 }

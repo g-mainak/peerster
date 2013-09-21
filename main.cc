@@ -21,7 +21,10 @@ ChatDialog::ChatDialog()
 	QStringList args = QCoreApplication::arguments();
 	for(int i=1; i< args.size(); i++)
 		if (args.at(i) == "-noforward")
+		{
 			forward = false;
+			qDebug() << "NOFORWARD";
+		}
 
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
@@ -143,11 +146,15 @@ void ChatDialog::transmitOriginalMessage(QString message)
 
 void ChatDialog::transmitRumorMessage(QVariantMap qvm, quint16 peer)
 {
-	QByteArray array = serialize(qvm);
-	socket.transmit(array, peer);
-	qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << peer; 
-    connect(timeout, SIGNAL(timeout()), this, SLOT(coinFlip()));
-    timeout->start(1000);
+	if (!qvm.empty())
+	{
+		qDebug() << qvm;
+		QByteArray array = serialize(qvm);
+		socket.transmit(array, peer);
+		qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << peer; 
+	    connect(timeout, SIGNAL(timeout()), this, SLOT(coinFlip()));
+	    timeout->start(1000);
+	}
 }
 
 void ChatDialog::transmitRouteRumorMessage(QVariantMap *qvm)
@@ -193,6 +200,11 @@ void ChatDialog::receiveMessage()
 	bool containsLastIp;
 	if (containsLastIp = qvm.contains("LastIP"))
 		socket.findPeer(QHostAddress(qvm.value("LastIP").toUInt()), qvm.value("LastPort").toInt());
+
+	for (int i = 0; i < socket.getNumPeers(); ++i)
+	{
+		qDebug() << "Peer " << socket.getPeer(i)->getHostname() << socket.getPeer(i)->getIp() << socket.getPeer(i)->getPort();
+	}
 
 	if (qvm.size() == 1)
 		receiveStatus(qvm, peerIndex);
@@ -291,7 +303,7 @@ void ChatDialog::receiveRumor(QVariantMap qvm, quint16 peer, bool indirect)
 		{
 			Peer *p = socket.getPeer(peer);
 			if (qvm.value("Origin").toString() != identifier)
-				rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNum").toUInt());
+				rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNo").toUInt());
 			textview->append(qvm.value("Origin").toString() + QString(": ") + qvm.value("ChatText").toString());
 			insertIntoPrevMessages(qvm.value("Origin").toString(), qvm.value("SeqNo").toUInt(), qvm);
 			transmitStatusMessage(peer);
@@ -302,11 +314,15 @@ void ChatDialog::receiveRumor(QVariantMap qvm, quint16 peer, bool indirect)
 	}
 	else if (qvm.size() == 4) // Route rumour
 	{
-		Peer *p = socket.getPeer(peer);
-		if (qvm.value("Origin").toString() != identifier)
-			rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNum").toUInt());
-		transmitStatusMessage(peer);
-		transmitRouteRumorMessage(&qvm);
+		if (!rt.alreadyInTable(qvm) && qvm.value("Origin").toString() != identifier)
+		{
+			qDebug() << qvm.value("Origin").toString() << identifier;
+			Peer *p = socket.getPeer(peer);
+			rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNo").toUInt());
+			qDebug() << "Trying to insert";
+			// transmitStatusMessage(peer);
+			transmitRouteRumorMessage(&qvm);
+		}
 	}
 }
 

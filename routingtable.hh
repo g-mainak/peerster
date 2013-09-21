@@ -22,6 +22,7 @@ class RoutingTable : public QObject
 		void insert(QString, QHostAddress, quint16, bool, quint32);
 		QStringList displayAll();
 		QPair<QHostAddress, quint16> findByOrigin(QString origin);
+		bool alreadyInTable(QVariantMap);
 
 	private:
 		QHash<QString, routingTableElement > table;
