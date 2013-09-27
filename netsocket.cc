@@ -37,20 +37,20 @@ quint16 NetSocket::randomPeer()
 	return (rand() % peers.size());
 }
 
-void NetSocket::transmitAll(QByteArray array)
+void NetSocket::transmit(QByteArray array, quint16 peerNumber)
 {
-	for(int i = 0; i < peers.size(); i++) 
-		if (peers[i]->notDisabled())
-			if (!writeDatagram(array, peers[i]->getIp(), peers[i]->getPort()))
+	if (peers[peerNumber]->notDisabled())
+		if (!writeDatagram(array, peers[peerNumber]->getIp(), peers[peerNumber]->getPort()))
 			{	
 				qDebug() << "Could not send datagram. Sorry!";
 			}
 }
 
-void NetSocket::transmit(QByteArray array, quint16 peerNumber)
+void NetSocket::transmitAll(QByteArray array)
 {
-	if (peers[peerNumber]->notDisabled())
-		if (!writeDatagram(array, peers[peerNumber]->getIp(), peers[peerNumber]->getPort()))
+	for(int i = 0; i < peers.size(); i++) 
+		if (peers[i]->notDisabled())
+			if (!writeDatagram(array, peers[i]->getIp(), peers[i]->getPort()))
 			{	
 				qDebug() << "Could not send datagram. Sorry!";
 			}

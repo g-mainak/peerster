@@ -1,12 +1,3 @@
-
-#include <unistd.h>
-
-#include <QVBoxLayout>
-#include <QApplication>
-#include <QDebug>
-#include <QHostInfo>
-#include <assert.h>
-#include <QTimer>
 #include "main.hh"
 
 ChatDialog::ChatDialog()
@@ -43,10 +34,6 @@ ChatDialog::ChatDialog()
 	hostinput = new QLineEdit(this);
 	connect(hostinput, SIGNAL(returnPressed()), this, SLOT(gotNewPeer()));
 
-
-	// Lay out the widgets to appear in the main window.
-	// For Qt widget and layout concepts see:
-	// http://doc.qt.nokia.com/4.7-snapshot/widgets-and-layouts.html
 	QVBoxLayout *vLayout = new QVBoxLayout();
 	vLayout->addWidget(textview);
 	vLayout->addWidget(textinput);
@@ -63,16 +50,152 @@ ChatDialog::ChatDialog()
 	connect(&socket, SIGNAL(readyRead()), this, SLOT(receiveMessage()));
 
 	entropy = new QTimer(this);
-    connect(entropy, SIGNAL(timeout()), this, SLOT(ping()));
-    entropy->start(10000);
+  connect(entropy, SIGNAL(timeout()), this, SLOT(ping()));
+  entropy->start(10000);
 
-    timeout = new QTimer(this);
-    timeout->setSingleShot(true);
+  routeRumor = new QTimer(this);
+  connect(routeRumor, SIGNAL(timeout()), this, SLOT(transmitRouteRumorMessage()));
+  routeRumor->start(60000);
+  emit transmitRouteRumorMessage();
+}
 
-    routeRumor = new QTimer(this);
-    connect(routeRumor, SIGNAL(timeout()), this, SLOT(transmitRouteRumorMessage()));
-    routeRumor->start(60000);
-    emit transmitRouteRumorMessage();
+void ChatDialog::receiveMessage()
+{
+	QByteArray datagram;
+    datagram.resize(socket.pendingDatagramSize());
+    QHostAddress sender;
+    quint16 senderPort;
+    socket.readDatagram(datagram.data(), datagram.size(),
+                                    &sender, &senderPort);
+	QVariantMap qvm;
+	QDataStream in(&datagram, QIODevice::ReadOnly);
+	in >> qvm;	
+
+	if (qvm.contains("Want") && qvm.size() == 1)
+		receiveStatus(qvm, socket.findPeer(sender, senderPort));
+	else if (qvm.contains("Origin") && qvm.contains("SeqNo"))
+		receiveRumor(qvm, socket.findPeer(sender, senderPort));
+	else if (qvm.contains("Dest"))
+		receivePrivateMessage(qvm);
+	else
+		qDebug() << "Malformed message" << qvm<< " received. Ignoring it";
+}
+
+void ChatDialog::receiveStatus(QVariantMap foreignStatusMap, quint16 peer)
+{
+	qDebug() << "Received Status Message from " << peer;
+	QVariantMap statusMap = createStatusMap();
+	int x = compare(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap());
+	switch (x)
+	{
+		case 1: qDebug() << "We're AHEAD";
+			if (forward)
+			{
+				startRumorMongering(findAhead(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()), peer);
+			}
+			break;
+		case -1: qDebug() << "We're BEHIND";
+			transmitStatusMessage(peer);
+			break;
+		case 0: qDebug() << "We're SAME";
+			if (rand() % 2)
+			{
+				qDebug() << "RANDOM EXIT";
+				return;
+			}
+			else
+			{
+				qDebug() << "RANDOM RERUMOR";
+				startRumorMongering();
+			}
+			break;
+		default: qDebug() << "Malformed Status message. Ignoring.";
+			break;
+	}
+}
+
+void ChatDialog::receiveRumor(QVariantMap qvm, quint16 peer)
+{
+	Peer *p = socket.getPeer(peer);
+	bool indirect = true;
+	if ((indirect = qvm.contains("LastIP")))
+		socket.findPeer(QHostAddress(qvm.value("LastIP").toUInt()), qvm.value("LastPort").toInt());
+	qvm.insert("LastIP", p->getIp().toIPv4Address());
+	qvm.insert("LastPort", p->getPort());
+	qDebug() << "Received rumor message" << qvm << " from " << peer;
+	if (!newMessage(qvm))
+	{
+		if (qvm.contains("ChatText"))
+			textview->append(qvm.value("Origin").toString() + QString(": ") + qvm.value("ChatText").toString());
+		rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNo").toUInt());
+		insertIntoPrevMessages(qvm.value("Origin").toString(), qvm.value("SeqNo").toUInt(), qvm);
+		transmitStatusMessage(peer);
+		if (!qvm.contains("ChatText")) // Route rumor
+			transmitRouteRumorMessage(qvm);
+		else if (forward)
+			startRumorMongering();
+	}
+	else
+		qDebug()<<"Same mesg";
+}
+
+void ChatDialog::receivePrivateMessage(QVariantMap qvm)
+{
+	if (qvm.value("Dest") == identifier)
+		textview->append(QString("PM: ") + qvm.value("ChatText").toString());
+	else if (forward)
+	{
+		qvm["HopLimit"] = qvm["HopLimit"].toInt() - 1;
+		transmitPrivateMessage(qvm);
+	}
+
+}
+
+void ChatDialog::transmitStatusMessage(quint16 peer)
+{
+	QByteArray array = serialize(createStatusMap());
+	socket.transmit(array, peer);
+	qDebug() << "TRANSMITTED status message "<< createStatusMap() <<"to " << peer; 
+}
+
+void ChatDialog::transmitOriginalMessage(QString message)
+{
+	textview->append(QString("Me: ") + message);
+	QVariantMap qvm = createRumorMap(message);
+	QByteArray array = serialize(qvm);
+	qDebug() << "TRANSMITTING original message" << qvm;
+	insertIntoPrevMessages(identifier, seqNum - 1, qvm);
+	if (forward) startRumorMongering();
+}
+
+void ChatDialog::transmitRumorMessage(QVariantMap qvm, quint16 peer)
+{
+	QByteArray array = serialize(qvm);
+	socket.transmit(array, peer);
+	qDebug() << "TRANSMITTED rumor message " << qvm << "to " << peer; 
+}
+
+void ChatDialog::transmitRouteRumorMessage()
+{
+	transmitRouteRumorMessage(createRumorMap(""));
+}
+
+void ChatDialog::transmitRouteRumorMessage(QVariantMap qvm)
+{
+	qvm.remove("ChatText");
+	insertIntoPrevMessages(qvm.value("Origin").toString(), qvm.value("SeqNo").toUInt(), qvm);
+	QByteArray array = serialize(qvm);
+	socket.transmitAll(array);
+	qDebug() << "TRANSMITTED route rumor message to all peers"; 
+}
+
+void ChatDialog::transmitPrivateMessage(QVariantMap qvm)
+{
+	QPair<QHostAddress, quint16> qp = rt.findByOrigin(qvm.value("Dest").toString());
+	quint16 peerIndex = socket.findPeer(qp.first, qp.second);
+	if (forward)
+		socket.transmit(serialize(qvm), peerIndex);
+	qDebug() << "TRANSMITTED PM " + QString::number(qvm.value("HopLimit").toInt()) + "to " + QString::number(peerIndex);
 }
 
 void ChatDialog::gotNewPeer()
@@ -85,16 +208,19 @@ QVariantMap ChatDialog::createStatusMap()
 {
 	QVariantMap qvm, nestedQvm;
 	QHashIterator<QString, quint32> i(prevMessageIds);
+	qDebug() << "CSM";
 	while (i.hasNext())
 	{
 		i.next();
 		QList<quint32> list = prevMessageIds.values(i.key());
 		qSort(list.begin(), list.end());
 		quint32 j = 0;
+		qDebug() << i.key() << list;
 		while(list.at(j) == j + 1)
 			j++;
 		nestedQvm.insert(i.key(), j + 1);
 	}
+	qDebug() << "/CSM";
 	qvm["Want"] = nestedQvm;
 	// qDebug() << "Nested QVM:" << qvm;
 	return qvm;
@@ -109,15 +235,6 @@ QVariantMap ChatDialog::createRumorMap(QString message)
 	return qvm;
 }
 
-QVariantMap ChatDialog::createRouteRumorMap()
-{
-	QVariantMap qvm;
-	qvm["Origin"] = identifier;
-	qvm["SeqNo"] = seqNum;
-	return qvm;
-}
-
-
 //Serialize into a QByteArray using a QDataStream object
 QByteArray ChatDialog::serialize(QVariantMap qvm)
 {
@@ -127,130 +244,10 @@ QByteArray ChatDialog::serialize(QVariantMap qvm)
 	return array;
 }
 
-void ChatDialog::transmitPrivateMessage(QVariantMap qvm)
-{
-	QPair<QHostAddress, quint16> qp = rt.findByOrigin(qvm.value("Dest").toString());
-	quint16 peerIndex = socket.findPeer(qp.first, qp.second);
-	socket.transmit(serialize(qvm), peerIndex);
-	// qDebug() << "Transmitted PM " + QString::number(qvm.value("HopLimit").toInt()) + "to " + QString::number(peerIndex);
-}
-
-void ChatDialog::transmitOriginalMessage(QString message)
-{
-	textview->append(QString("Me: ") + message);
-	QVariantMap qvm = createRumorMap(message);
-	QByteArray array = serialize(qvm);
-	insertIntoPrevMessages(identifier, seqNum - 1, qvm);
-	if (forward) startRumorMongering();
-}
-
-void ChatDialog::transmitRumorMessage(QVariantMap qvm, quint16 peer)
-{
-	if (!qvm.empty())
-	{
-		qDebug() << qvm;
-		QByteArray array = serialize(qvm);
-		socket.transmit(array, peer);
-		qDebug() << "TRANSMITTED rumor message " << qvm.value("ChatText") << "to " << peer; 
-	    connect(timeout, SIGNAL(timeout()), this, SLOT(coinFlip()));
-	    timeout->start(1000);
-	}
-}
-
-void ChatDialog::transmitRouteRumorMessage(QVariantMap *qvm)
-{
-	QByteArray array = serialize(qvm ? *qvm : createRouteRumorMap());
-	socket.transmitAll(array);
-	qDebug() << "TRANSMITTED route rumor message to all peers"; 
-}
-
-void ChatDialog::coinFlip()
-{
-	if (rand() % 2){}
-		//startRumorMongering();
-}
 
 void ChatDialog::ping()
 {
 	transmitStatusMessage(socket.randomPeer());
-	// for (int i = 0; i < socket.getNumPeers(); ++i)
- //    	{
- //    		qDebug() << "Peer " << socket.getPeer(i)->getIp() << socket.getPeer(i)->getPort();
- //    	}
-}
-void ChatDialog::transmitStatusMessage(quint16 peer)
-{
-	QByteArray array = serialize(createStatusMap());
-	socket.transmit(array, peer);
-	qDebug() << "TRANSMITTED status message to " << peer; 
-}
-
-void ChatDialog::receiveMessage()
-{
-	QByteArray datagram;
-    datagram.resize(socket.pendingDatagramSize());
-    QHostAddress sender;
-    quint16 senderPort;
-    socket.readDatagram(datagram.data(), datagram.size(),
-                                    &sender, &senderPort);
-	QVariantMap qvm;
-	QDataStream in(&datagram, QIODevice::ReadOnly);
-	in >> qvm;
-	quint16 peerIndex = socket.findPeer(sender, senderPort);
-	bool containsLastIp;
-	if (containsLastIp = qvm.contains("LastIP"))
-		socket.findPeer(QHostAddress(qvm.value("LastIP").toUInt()), qvm.value("LastPort").toInt());
-
-	for (int i = 0; i < socket.getNumPeers(); ++i)
-	{
-		qDebug() << "Peer " << socket.getPeer(i)->getHostname() << socket.getPeer(i)->getIp() << socket.getPeer(i)->getPort();
-	}
-
-	if (qvm.size() == 1)
-		receiveStatus(qvm, peerIndex);
-	else if (qvm.size() >= 2 || qvm.size() <= 5)
-	{
-		qvm.insert("LastIP", sender.toIPv4Address());
-		qvm.insert("LastPort", senderPort);
-		if (qvm.contains("Dest"))
-			receivePrivateMessage(qvm);
-		else if (qvm.contains("Origin"))
-			receiveRumor(qvm, peerIndex, containsLastIp);
-		else
-			qDebug() << "Malformed message received. Ignoring it.";
-	}
-	else
-	{
-		qDebug() << qvm.size();
-		qDebug() << "Malformed message received. Ignoring it";
-	}
-}
-
-
-
-void ChatDialog::receiveStatus(QVariantMap foreignStatusMap, quint16 peer)
-{
-	qDebug() << "Received Status Message from " << peer;
-	disconnect(timeout, 0, 0, 0);
-	QVariantMap statusMap = createStatusMap();
-	switch (compare(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()))
-	{
-		case 1: qDebug() << "We're AHEAD";
-			if (forward)
-				startRumorMongering(findAhead(statusMap.value("Want").toMap(), foreignStatusMap.value("Want").toMap()), peer);
-			break;
-		case -1: qDebug() << "We're BEHIND";
-			transmitStatusMessage(peer);
-			break;
-		case 0: qDebug() << "We're SAME";
-			if (rand() % 2)
-				return;
-			else
-				startRumorMongering();
-			break;
-		default: qDebug() << "Malformed Status message. Ignoring.";
-			break;
-	}
 }
 
 void ChatDialog::startRumorMongering()
@@ -271,77 +268,42 @@ void ChatDialog::startRumorMongering(QVariantMap qvm, quint16 peer)
 
 bool ChatDialog::newMessage(QVariantMap qvm)
 {
-	return (prevMessages.contains(qvm.value("Origin").toString() + "-|42|-" + QString(qvm.value("SeqNo").toUInt())));
+	return (prevMessages.contains(qvm.value("Origin").toString() + "-|42|-" + QString::number(qvm.value("SeqNo").toUInt())));
 }
 
 void ChatDialog::insertIntoPrevMessages(QString origin, quint32 sequence, QVariantMap message)
 {
-	prevMessageIds.insert(origin, sequence);
-	QString key = origin + QString("-|42|-") + QString(sequence);
+	if(!prevMessageIds.contains(origin, sequence))
+		prevMessageIds.insert(origin, sequence);
+	QString key = origin + QString("-|42|-") + QString::number(sequence);
 	prevMessages.insert(key, message);
 	QVariantMap qvm;
 	qvm.insert("origin", origin);
 	qvm.insert("message_sequence", sequence);
 	lastMessage = qvm;
+	// qDebug() << "MESSAGE TABLE";
+	// QHashIterator<QString, QVariantMap > i(prevMessages);
+	// while (i.hasNext()) {
+ //    i.next();
+ //    qDebug() << i.key() << ": " << i.value() << endl;
+	// }
 }
 
 QVariantMap ChatDialog::getPrevMessage(QString origin, quint32 sequence)
 {
-	QString key = origin + QString("-|42|-") + QString(sequence);
+	QString key = origin + QString("-|42|-") + QString::number(sequence);
+	qDebug() << "KEY: " << key << prevMessages.contains(key);
 	if (prevMessages.contains(key))
 		return prevMessages.value(key);
 	else
 		return QVariantMap();
 }
 
-void ChatDialog::receiveRumor(QVariantMap qvm, quint16 peer, bool indirect)
-{
-	qDebug() << "Received rumor message" << qvm.value("ChatText").toString() << " from " << peer;
-	if (qvm.size() == 5) //Chat rumour
-	{
-		if (!newMessage(qvm))
-		{
-			Peer *p = socket.getPeer(peer);
-			if (qvm.value("Origin").toString() != identifier)
-				rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNo").toUInt());
-			textview->append(qvm.value("Origin").toString() + QString(": ") + qvm.value("ChatText").toString());
-			insertIntoPrevMessages(qvm.value("Origin").toString(), qvm.value("SeqNo").toUInt(), qvm);
-			transmitStatusMessage(peer);
-			if (forward) startRumorMongering();
-		}
-		else
-			qDebug()<<"Same mesg";
-	}
-	else if (qvm.size() == 4) // Route rumour
-	{
-		if (!rt.alreadyInTable(qvm) && qvm.value("Origin").toString() != identifier)
-		{
-			qDebug() << qvm.value("Origin").toString() << identifier;
-			Peer *p = socket.getPeer(peer);
-			rt.insert(qvm.value("Origin").toString(), p->getIp(), p->getPort(), indirect, qvm.value("SeqNo").toUInt());
-			qDebug() << "Trying to insert";
-			// transmitStatusMessage(peer);
-			transmitRouteRumorMessage(&qvm);
-		}
-	}
-}
-
-void ChatDialog::receivePrivateMessage(QVariantMap qvm)
-{
-	if (qvm.value("Dest") == identifier)
-		textview->append(QString("PM: ") + qvm.value("ChatText").toString());
-	else if (forward)
-	{
-		qvm["HopLimit"] = qvm["HopLimit"].toInt() - 1;
-		transmitPrivateMessage(qvm);
-	}
-
-}
 
 int ChatDialog::compare(QVariantMap current, QVariantMap foreign)
 {
 	QMapIterator<QString, QVariant> i(current);
-	bool ahead = false, behind = false;
+	bool ahead =false, behind = false;
 	while (i.hasNext())
 	{
 		i.next();
@@ -379,13 +341,14 @@ QVariantMap ChatDialog::findAhead(QVariantMap current, QVariantMap foreign)
 		{
 			QVariantMap qvm;
 			qvm.insert(QString("origin"), i.key());
-			qvm.insert(QString("message_sequence"), (y==0)?1:y);
+			qvm.insert(QString("message_sequence"), (y==0)?1:y); // you don't have y, 
 			return qvm;
 		}
 	}
 	qDebug() << "Message does not exist! Canceling.";
 	return QVariantMap();
 }
+
 int main(int argc, char **argv)
 {
 	// Initialize Qt toolkit
