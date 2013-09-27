@@ -9,5 +9,5 @@ INCLUDEPATH += .
 QT += network
 
 # Input
-HEADERS += main.hh mtextedit.hh netsocket.hh peer.hh routingtable.hh point2pointview.hh MPMEdit.hh
-SOURCES += main.cc mtextedit.cc netsocket.cc peer.cc routingtable.cc point2pointview.cc MPMEdit.cc
+HEADERS += main.hh mtextedit.hh netsocket.hh peer.hh point2pointview.hh MPMEdit.hh routingtable.hh
+SOURCES += main.cc mtextedit.cc netsocket.cc peer.cc point2pointview.cc MPMEdit.cc routingtable.cc

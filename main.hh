@@ -6,13 +6,19 @@
 #include <QHash>
 #include <QVector>
 #include <QLineEdit>
+#include <unistd.h>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QApplication>
+#include <QDebug>
+#include <QHostInfo>
+#include <assert.h>
+#include <QTimer>
 #include "mtextedit.hh"
 #include "netsocket.hh"
 #include "peer.hh"
 #include "routingtable.hh"
 #include "point2pointview.hh"
-#include <QListView>
-#include <QModelIndex>
 
 class ChatDialog : public QDialog
 {
@@ -24,7 +30,7 @@ class ChatDialog : public QDialog
 		QVariantMap createRumorMap(QString);
 		QVariantMap createRouteRumorMap();
 		void receiveStatus(QVariantMap, quint16);
-		void receiveRumor(QVariantMap, quint16, bool);
+		void receiveRumor(QVariantMap, quint16);
 		void receivePrivateMessage(QVariantMap);
 		void transmitRumorMessage(QVariantMap, quint16);
 		void transmitStatusMessage(quint16);
@@ -43,15 +49,14 @@ class ChatDialog : public QDialog
 		void ping();
 		void receiveMessage();
 		void transmitOriginalMessage(QString);
-		void transmitRouteRumorMessage(QVariantMap* = NULL);
+		void transmitRouteRumorMessage();
+		void transmitRouteRumorMessage(QVariantMap);
+		void transmitPrivateMessage(QVariantMap);
 		void gotNewPeer();
 		void coinFlip();
-		void transmitPrivateMessage(QVariantMap);
 
 	private:
-		QTimer *timeout;
-		QTimer *entropy;
-		QTimer *routeRumor;
+		bool forward;
 		QTextEdit *textview;
 		MTextEdit *textinput;
 		QLineEdit *hostinput;
@@ -63,7 +68,9 @@ class ChatDialog : public QDialog
 		QString identifier;
 		QVariantMap lastMessage;
 		RoutingTable rt;
-		bool forward;
+		QTimer *entropy;
+		QTimer *routeRumor;
+		QTimer *timeout;
 };
 
 
