@@ -20,10 +20,13 @@ class NetSocket : public QUdpSocket
 		quint16 randomPeer();
 		quint16 findPeer(QHostAddress, quint16);
 		void addPeer(QString);
-		QVector<Peer*> peers;
+		Peer* getPeer(quint16);
+		quint16 getNumPeers();
+		void transmitAll(QByteArray);
 
 	private:
 		int myPortMin, myPortMax;
+		QVector<Peer*> peers;
 };
 
 #endif // PEERSTER_NETSOCKET_HH
