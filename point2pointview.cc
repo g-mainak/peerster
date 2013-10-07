@@ -24,10 +24,10 @@ void Point2PointView::createPrivateMessage(QModelIndex index)
 
 void Point2PointView::createPrivateMessageMap(QString message, QString destination)
 {
+
 	QVariantMap qvm;
 	qvm["Dest"] = destination;
 	qvm["ChatText"] = message;
 	qvm["HopLimit"] = (quint32)10;
-	qDebug() << qvm;
 	emit privateMessageSignal(qvm);
 }

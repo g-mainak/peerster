@@ -22,6 +22,7 @@ class NetSocket : public QUdpSocket
 		Peer* getPeer(quint16);
 		quint16 getNumPeers();
 		void transmitAll(QByteArray);
+		void transmitEvenly(QByteArray, quint32, bool);
 
 	private:
 		int myPortMin, myPortMax;

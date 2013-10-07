@@ -14,11 +14,18 @@
 #include <QHostInfo>
 #include <assert.h>
 #include <QTimer>
+#include <QPushButton>
+#include <QFileDialog>
+#include <QLabel>
 #include "mtextedit.hh"
 #include "netsocket.hh"
 #include "peer.hh"
 #include "routingtable.hh"
 #include "point2pointview.hh"
+#include "FileMetaData.hh"
+#include "FileTransferDialog.hh"
+#include "FileDownload.hh"
+#include "FileSearch.hh"
 
 class ChatDialog : public QDialog
 {
@@ -29,11 +36,18 @@ class ChatDialog : public QDialog
 		QVariantMap createStatusMap();
 		QVariantMap createRumorMap(QString);
 		QVariantMap createRouteRumorMap();
+		QVariantMap createBlockReply(QString, QByteArray, QByteArray);
 		void receiveStatus(QVariantMap, quint16);
 		void receiveRumor(QVariantMap, quint16);
 		void receivePrivateMessage(QVariantMap);
+		void receiveBlockRequest(QVariantMap);
+		void receiveBlockReply(QVariantMap qvm);
+		void receiveSearchReply(QVariantMap);
 		void transmitRumorMessage(QVariantMap, quint16);
 		void transmitStatusMessage(quint16);
+		void transmitBlockRequest(QVariantMap);
+		void transmitBlockReply(QVariantMap);
+		void transmitSearchReply(QVariantMap);
 		void startRumorMongering(QVariantMap, quint16);
 		void startRumorMongering();
 
@@ -52,14 +66,21 @@ class ChatDialog : public QDialog
 		void transmitRouteRumorMessage();
 		void transmitRouteRumorMessage(QVariantMap);
 		void transmitPrivateMessage(QVariantMap);
-		void gotNewPeer();
+		void transmitSearchRequest(QVariantMap);
+		void initiateBlockRequest();
+		void createNewPeer();
+		void createFile();
+		void createSearch();
+		void createBlockRequest(QString, QByteArray);
 		void coinFlip();
+		void receiveSearchRequest(QVariantMap qvm);
 
 	private:
 		bool forward;
 		QTextEdit *textview;
 		MTextEdit *textinput;
 		QLineEdit *hostinput;
+		QLineEdit *searchinput;
 		Point2PointView *tableview;
 		NetSocket socket;
 		quint32 seqNum;
@@ -71,6 +92,9 @@ class ChatDialog : public QDialog
 		QTimer *entropy;
 		QTimer *routeRumor;
 		QTimer *timeout;
+		FileMetaData metadata;
+		FileDownload downloadList;
+		FileSearch *search;
 };
 
 

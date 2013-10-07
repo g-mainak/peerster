@@ -1,6 +1,7 @@
 #include "mtextedit.hh"
 
-MTextEdit::MTextEdit(QWidget *parent) : QTextEdit(parent) {}
+MTextEdit::MTextEdit(QWidget *parent) : QTextEdit(parent) 
+{}
 
 void MTextEdit::keyPressEvent(QKeyEvent *event)
 {
@@ -8,7 +9,7 @@ void MTextEdit::keyPressEvent(QKeyEvent *event)
 	{
 		emit messageSent(this->toPlainText());
 		// Clear the textinput to get ready for the next input message.
-		this->clear();		
+		this->clear();
 	}
 	else
 		QTextEdit::keyPressEvent(event);

@@ -22,7 +22,7 @@ class Point2PointView : public QListView
 		void createPrivateMessageMap(QString, QString);
 
 	signals:
-    	void privateMessageSignal(QVariantMap);
+    void privateMessageSignal(QVariantMap);
 
 	private:
 		QStringListModel model;

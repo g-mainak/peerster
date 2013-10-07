@@ -27,9 +27,6 @@ bool NetSocket::bind()
 		}
 	}
 	return flag;
-	// qDebug() << "Oops, no ports in my default range " << myPortMin
-	// 	<< "-" << myPortMax << " available";
-	// return false;
 }
 
 quint16 NetSocket::randomPeer()
@@ -54,6 +51,18 @@ void NetSocket::transmitAll(QByteArray array)
 			{	
 				qDebug() << "Could not send datagram. Sorry!";
 			}
+}
+
+void NetSocket::transmitEvenly(QByteArray array, quint32 budget, bool first)
+{
+	for (quint32 i = (first?0:budget); i < (first?budget:peers.size()); i++)
+		if (peers[i]->notDisabled())
+		{
+			if (!writeDatagram(array, peers[i]->getIp(), peers[i]->getPort()))
+			{	
+				qDebug() << "Could not send datagram. Sorry!";
+			}
+		}
 }
 
 quint16 NetSocket::findPeer(QHostAddress address, quint16 port)
