@@ -48,6 +48,11 @@ QHostAddress Peer::getIp()
 	return ip;
 }
 
+QString Peer::getHostname()
+{
+	return hostname;
+}
+
 quint16 Peer::getPort()
 {
 	return port;

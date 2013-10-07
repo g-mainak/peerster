@@ -7,7 +7,8 @@ TARGET =
 DEPENDPATH += .
 INCLUDEPATH += .
 QT += network
+CONFIG += crypto
 
 # Input
-HEADERS += main.hh mtextedit.hh netsocket.hh peer.hh
-SOURCES += main.cc mtextedit.cc netsocket.cc peer.cc
+HEADERS += main.hh mtextedit.hh netsocket.hh peer.hh point2pointview.hh MPMEdit.hh routingtable.hh FileMetaData.hh FileTransferDialog.hh FileDownload.hh FileSearch.hh
+SOURCES += main.cc mtextedit.cc netsocket.cc peer.cc point2pointview.cc MPMEdit.cc routingtable.cc FileMetaData.cc FileTransferDialog.cc FileDownload.cc FileSearch.cc

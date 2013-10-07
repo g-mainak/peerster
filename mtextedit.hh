@@ -9,11 +9,11 @@ class MTextEdit : public QTextEdit
 	Q_OBJECT
 
     public:
-    	MTextEdit(QWidget *parent);
+    	MTextEdit(QWidget *);
     	void keyPressEvent(QKeyEvent *);
 
     signals:
-    	void messageSent(QString message);
+    	void messageSent(QString);
 };
 
 #endif // PEERSTER_MTEXTEDIT_HH

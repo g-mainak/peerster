@@ -18,6 +18,7 @@ class Peer : public QObject
 		Peer(QString);
 		Peer(QHostAddress, quint16);
 		QHostAddress getIp();
+		QString getHostname();
 		quint16 getPort();
 		bool notDisabled();
 
