@@ -1,0 +1,27 @@
+I propose to create a cloud-based email client that is compatible with
+existing email clients. It will have full send/receive capabilities with all
+other email systems (Gmail, Yahoo, Hotmail, etc.). It will also have the
+ability to receive and send encrypted messages signed with PGP public keys.
+
+In particular, the client will support:
+	Confidentiality: The message is encrypted with a session key, and then both
+		the message and the key are sent to the receiver. However, the session 
+		key is encrypted with the receiver’s public key to protect it during 
+		transmission. The client will allow both the encryption and the 
+		decryption of messages.
+	Message Integrity using digital signatures: The client will also support 
+		generating a digital signature for the message by computing a hash 
+		(message digest) from the plaintext and then creating the signature 
+		using the sender’s private key on the message digest. This will allow the
+		receiver to verify that the message has not been tampered with en-route,
+		preventing Man-in-the-middle attacks.
+
+Other features: 
+	1.  The first version of the client will only support plaintext email, but if
+		there is time, I hope to enable HTML email as well.  
+	2.  The client will have a web interface thus replacing commercial cloud email 
+		providers like Gmail that are subject to NSA surveillance. I hope to host 
+		the server in the Zoo and use Ruby on Rails to build the web interface. 
+	3.  Another long-term feature I envision is to perform pattern recognition on 
+		the previous emails received to calculate statistics like average time to 
+		reply for each contact, best time to email a person, etc.
