@@ -1,0 +1,16 @@
+=provide(:title, 'Freemail: Sign In or Register')
+.col-xs-6
+  %h1 Sign In
+  = form_tag ("/sign_in") do
+    =label_tag "Email"
+    = text_field_tag :email, nil, class: 'form-control'
+    %br
+    = label_tag 'Password'
+    = password_field_tag :password, nil, class: 'form-control'
+    %br
+    = submit_tag "Sign In", class: "btn btn-large btn-primary"
+.col-xs-6
+  %h1 Sign up
+  = form_for(@user) do |f|
+    = render 'fields', f: f
+    = f.submit "Create my account", class: "btn btn-large btn-primary"

@@ -1,0 +1,23 @@
+%table.table
+  - @messages.each_with_index do |message, index|
+    %tr
+      %td
+        %strong
+          = message.From.to_s
+        said to 
+        %strong
+          = message.To.to_s
+        = distance_of_time_in_words(@times[index], Time.now) + " ago"
+        %br
+        %strong
+          Subject:
+        = message.subject
+        %br
+        - if message.multipart?
+          = begin @crypto.decrypt message.text_part.decoded rescue message.text_part.decoded end
+        - else
+          = begin @crypto.decrypt message.decoded rescue message.decoded end
+  %br
+  %br
+
+= link_to "Reply", write_mailbox_path(to: @reply_address, subject: "Re: " + @messages.last.subject)

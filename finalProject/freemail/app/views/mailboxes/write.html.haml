@@ -1,0 +1,18 @@
+%h1
+  Send Mail
+
+.col-xs-8
+  = form_tag (send_mail_mailbox_path) do
+    = label_tag "To"
+    = text_field_tag :to, params[:to], class: 'form-control'
+    %br
+    = label_tag "Encrypt?"
+    = check_box_tag :encrypt, class: 'form-control'
+    %br
+    = label_tag "Subject"
+    = text_field_tag :subject, params[:subject], class: 'form-control'
+    %br
+    = label_tag "Message"
+    = text_area_tag :body, nil, class: 'form-control'
+    %br
+    = submit_tag "Send"

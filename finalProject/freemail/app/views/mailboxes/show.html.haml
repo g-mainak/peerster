@@ -1,0 +1,16 @@
+Conversations:
+%table.table
+  %tr
+    %th From
+    %th Subject
+    %th Time
+  - @conversations.each do |thread|
+    %tr
+      %td
+        = link_to thread.addresses.to_sentence, thread
+      %td
+        = link_to thread.subject, thread
+      %td
+        = link_to (distance_of_time_in_words(thread.updated_at, Time.now) + " ago"), thread
+      
+= link_to "New Email", write_mailbox_path

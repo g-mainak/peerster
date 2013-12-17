@@ -1,0 +1,14 @@
+= f.label :name
+= f.text_field :name, class: 'form-control'
+%br
+
+= f.fields_for :mailboxes do |mb_f|
+  = mb_f.label :email
+  = mb_f.text_field :email, class: 'form-control'
+  %br
+  = mb_f.label :password
+  = mb_f.password_field :password, class: 'form-control'
+  %br
+  = mb_f.label :password_confirmation, "Confirm Password"
+  = mb_f.password_field :password_confirmation, class: 'form-control'
+  %br

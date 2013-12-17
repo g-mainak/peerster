@@ -1,0 +1,28 @@
+Your Mailboxes:
+%br
+- @mailboxes.each do |mb|
+  = link_to mb.email, mb
+  %br
+%br
+= link_to "Add new Mailbox"
+
+.col-xs-4
+  %h2 Add New Contact
+  = form_tag (add_contact_user_path(@user)) do
+    = label_tag "Name"
+    = text_field_tag :name, nil, class: 'form-control'
+    %br
+    = label_tag "Email"
+    = text_field_tag :email, nil, class: 'form-control'
+    %br
+    = label_tag "Key"
+    = text_area_tag :key, nil, class: 'form-control'
+    %br
+    = submit_tag "Add"
+.col-xs-4
+  %h2 Add Private Key
+  = form_tag (add_private_key_user_path(@user)) do
+    = label_tag "Key"
+    = text_area_tag :key, nil, class: 'form-control'
+    %br
+    = submit_tag "Add"

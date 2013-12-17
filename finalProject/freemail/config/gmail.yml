@@ -1,0 +1,17 @@
+---
+:mailboxes:
+  -
+    :email: "g.mainak@gmail.com"
+    :password: "****"
+    :name: "inbox"
+    # :delivery_method: logger
+    # :log_path: "log/gmail.log"
+    :delivery_url: "http://localhost:3000/incoming_email"
+    :delivery_token: "123456"
+  -
+    :email: "test.mainak@gmail.com"
+    :password: "****"
+    :name: "inbox"
+    :delivery_method: postback
+    :delivery_url: "http://localhost:3000/incoming_email"
+    :delivery_token: "123456"
